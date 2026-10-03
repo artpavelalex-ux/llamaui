@@ -1,0 +1,918 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Лама Чат</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #161a22;
+    --panel2: #1d222d;
+    --text: #e8ebf1;
+    --muted: #8b93a7;
+    --accent: #7c6cff;
+    --accent2: #9d8bff;
+    --user-bg: #2a2460;
+    --ai-bg: #1d222d;
+    --ok: #3ecf6f;
+    --err: #ff6b6b;
+    --radius: 14px;
+    --border: var(--border);
+    --border2: var(--border2);
+  }
+  body[data-theme="light"] {
+    --bg: #f5f6fa;
+    --panel: #ffffff;
+    --panel2: #eef0f6;
+    --text: #1a1e2a;
+    --muted: #6b7280;
+    --user-bg: #e4e0ff;
+    --ai-bg: #ffffff;
+    --border: #e2e5ee;
+    --border2: #d4d8e4;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    font-size: 15px;
+  }
+
+  /* ── Шапка ─────────────────────────────────────── */
+  header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .logo {
+    width: 30px; height: 30px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 15px; color: #fff;
+    flex-shrink: 0;
+  }
+  .title { font-weight: 700; font-size: 16px; letter-spacing: .2px; }
+  .status {
+    display: flex; align-items: center; gap: 7px;
+    color: var(--muted); font-size: 12.5px;
+    padding: 4px 12px;
+    background: var(--panel2);
+    border-radius: 20px;
+    margin-left: 4px;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #666; flex-shrink: 0; }
+  .dot.ok { background: var(--ok); }
+  .dot.err { background: var(--err); }
+  .dot.wait { background: #f0b429; animation: pulse 1.2s infinite; }
+  @keyframes pulse { 50% { opacity: .35; } }
+  .spacer { flex: 1; }
+
+  .btn {
+    border: none; cursor: pointer;
+    background: var(--panel2);
+    color: var(--text);
+    border-radius: 9px;
+    padding: 7px 14px;
+    font-size: 13px;
+    font-family: inherit;
+    transition: background .15s, transform .05s;
+    white-space: nowrap;
+  }
+  .btn:hover { background: #262d3d; }
+  .btn:active { transform: scale(.97); }
+  .btn.primary {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #fff; font-weight: 600;
+  }
+  .btn.primary:disabled { opacity: .5; cursor: default; }
+  .btn.on {
+    background: rgba(124, 108, 255, .25);
+    box-shadow: inset 0 0 0 1px var(--accent);
+    color: #c9c1ff;
+  }
+
+  /* ── Лента сообщений ───────────────────────────── */
+  main {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 18px 10px;
+    scroll-behavior: smooth;
+  }
+  .msg {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 18px;
+    max-width: 860px;
+    margin-left: auto; margin-right: auto;
+  }
+  .avatar {
+    width: 32px; height: 32px;
+    border-radius: 10px;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; font-weight: 700;
+  }
+  .avatar.user { background: #3a4a8a; }
+  .avatar.ai   { background: linear-gradient(135deg, var(--accent), var(--accent2)); }
+  .bubble-wrap { min-width: 0; }
+  .who {
+    font-size: 12px; color: var(--muted);
+    margin-bottom: 4px; font-weight: 600;
+  }
+  .bubble {
+    padding: 12px 16px;
+    border-radius: var(--radius);
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-wrap: anywhere;
+  }
+  .user .bubble { background: var(--user-bg); }
+  .ai   .bubble { background: var(--ai-bg); border: 1px solid var(--border); }
+  .bubble .cursor {
+    display: inline-block;
+    width: 8px; height: 16px;
+    background: var(--accent2);
+    vertical-align: text-bottom;
+    animation: pulse 1s infinite;
+    border-radius: 2px;
+    margin-left: 2px;
+  }
+  .sources {
+    margin-top: 8px;
+    display: flex; flex-wrap: wrap; gap: 6px;
+  }
+  .src {
+    font-size: 12px;
+    color: #c9c1ff;
+    background: rgba(124,108,255,.12);
+    border: 1px solid rgba(124,108,255,.35);
+    padding: 4px 10px;
+    border-radius: 20px;
+    cursor: pointer;
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .src:hover { background: rgba(124,108,255,.25); }
+
+  /* ── Экран приветствия ─────────────────────────── */
+  .welcome {
+    height: 100%;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    text-align: center; gap: 14px;
+    color: var(--muted);
+  }
+  .welcome .big-logo {
+    width: 74px; height: 74px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 22px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 38px; font-weight: 800; color: #fff;
+    box-shadow: 0 12px 40px rgba(124,108,255,.35);
+  }
+  .welcome h1 { color: var(--text); font-size: 22px; font-weight: 700; }
+  .welcome p { max-width: 460px; line-height: 1.5; }
+  .examples { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 8px; }
+  .example {
+    padding: 8px 14px;
+    border: 1px solid var(--border2);
+    background: var(--panel);
+    color: var(--text);
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 13.5px;
+    transition: border-color .15s;
+  }
+  .example:hover { border-color: var(--accent); }
+
+  /* ── Композер ──────────────────────────────────── */
+  .composer-wrap {
+    padding: 10px 18px 16px;
+    background: linear-gradient(transparent, var(--bg) 30%);
+  }
+  .composer {
+    max-width: 860px;
+    margin: 0 auto;
+    background: var(--panel2);
+    border: 1px solid var(--border2);
+    border-radius: 16px;
+    padding: 10px 12px 8px;
+    transition: border-color .15s;
+  }
+  .composer:focus-within { border-color: var(--accent); }
+  textarea {
+    width: 100%;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 15px;
+    line-height: 1.5;
+    resize: none;
+    max-height: 180px;
+    min-height: 24px;
+  }
+  textarea::placeholder { color: #5a6178; }
+  .composer-bottom {
+    display: flex; align-items: center; gap: 8px; margin-top: 6px;
+  }
+  .hint { color: #5a6178; font-size: 11.5px; margin-left: auto; }
+
+  /* ── Настройки ─────────────────────────────────── */
+  .modal-bg {
+    position: fixed; inset: 0;
+    background: rgba(5,7,10,.6);
+    display: none;
+    align-items: center; justify-content: center;
+    z-index: 10;
+  }
+  .modal-bg.show { display: flex; }
+  .modal {
+    background: var(--panel);
+    border: 1px solid var(--border2);
+    border-radius: 18px;
+    width: min(480px, 92vw);
+    padding: 22px;
+  }
+  .modal h2 { font-size: 17px; margin-bottom: 16px; }
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 12.5px; color: var(--muted); margin-bottom: 6px; }
+  .field input[type=text] {
+    width: 100%;
+    background: var(--panel2);
+    border: 1px solid var(--border2);
+    border-radius: 9px;
+    color: var(--text);
+    padding: 9px 12px;
+    font-size: 13.5px;
+    font-family: inherit;
+    outline: none;
+  }
+  .field input[type=text]:focus { border-color: var(--accent); }
+  .field .note { font-size: 11.5px; color: #5a6178; margin-top: 5px; line-height: 1.4; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+
+  /* ── Ошибки/уведомления ────────────────────────── */
+  .toast {
+    position: fixed;
+    left: 50%; transform: translateX(-50%);
+    bottom: 110px;
+    background: #2a1b1b;
+    color: #ffb4b4;
+    border: 1px solid #7a3030;
+    padding: 10px 18px;
+    border-radius: 12px;
+    font-size: 13.5px;
+    display: none;
+    z-index: 20;
+    max-width: 80vw;
+    box-shadow: 0 8px 30px rgba(0,0,0,.5);
+  }
+  .toast.show { display: block; }
+
+  /* Размышления reasoning-модели */
+  .think {
+    margin-top: 4px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .think summary {
+    cursor: pointer;
+    font-size: 12.5px;
+    color: #9a8fe0;
+    user-select: none;
+    padding: 4px 0;
+  }
+  .think summary:hover { color: #b7adff; }
+  .think-body {
+    background: rgba(255,255,255,.03);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-top: 6px;
+    max-height: 220px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    line-height: 1.5;
+    font-size: 12.5px;
+  }
+
+  /* Настройки: широкая модалка, сетка, селект модели */
+  .modal-wide { width: min(640px, 94vw); max-height: 88vh; overflow-y: auto; }
+  .modal h3 {
+    font-size: 14px;
+    color: var(--accent2);
+    margin: 14px 0 10px;
+    border-top: 1px solid var(--border);
+    padding-top: 14px;
+  }
+  .grid2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 18px;
+  }
+  select {
+    width: 100%;
+    background: var(--panel2);
+    border: 1px solid var(--border2);
+    border-radius: 9px;
+    color: var(--text);
+    padding: 9px 12px;
+    font-size: 13.5px;
+    font-family: inherit;
+    outline: none;
+  }
+  select:focus { border-color: var(--accent); }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+
+  /* Чипы прикреплённых файлов */
+  .attach-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #c9c1ff;
+    background: rgba(124,108,255,.12);
+    border: 1px solid rgba(124,108,255,.35);
+    padding: 4px 10px;
+    border-radius: 20px;
+    max-width: 240px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .attach-chip .rm {
+    cursor: pointer;
+    color: #8b93a7;
+    font-weight: 700;
+  }
+  .attach-chip .rm:hover { color: var(--err); }
+
+  /* ── Сайдбар чатов ──────────────────────────────── */
+  .layout { display: flex; flex: 1; min-height: 0; }
+  aside {
+    width: 250px;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .side-head {
+    padding: 14px 14px 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .side-title { font-size: 12px; color: var(--muted); font-weight: 700; letter-spacing: .8px; text-transform: uppercase; }
+  .btn-new {
+    border: none; cursor: pointer;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #fff; font-weight: 700; font-size: 16px;
+    width: 26px; height: 26px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    transition: transform .1s;
+  }
+  .btn-new:hover { transform: scale(1.1); }
+  .chat-list { flex: 1; overflow-y: auto; padding: 4px 8px; }
+  .chat-item {
+    padding: 9px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    margin-bottom: 2px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .chat-item:hover { background: var(--panel2); }
+  .chat-item.active { background: rgba(124,108,255,.18); box-shadow: inset 0 0 0 1px rgba(124,108,255,.4); }
+  .chat-name {
+    flex: 1; min-width: 0;
+    font-size: 13.5px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .chat-del {
+    display: none;
+    color: #8b93a7;
+    font-size: 12px;
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 5px;
+  }
+  .chat-item:hover .chat-del { display: block; }
+  .chat-del:hover { color: var(--err); background: rgba(255,107,107,.15); }
+  .side-model {
+    padding: 10px 12px;
+    border-top: 1px solid var(--border);
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+  .side-model select {
+    font-size: 12.5px;
+    padding: 7px 8px;
+    background: var(--panel2);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    color: var(--text);
+    outline: none;
+    width: 100%;
+    font-family: inherit;
+  }
+  .side-model select:hover { border-color: var(--accent); }
+  .side-model select:focus { border-color: var(--accent); }
+
+  /* Сворачивающиеся секции настроек */
+  .settings-section {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 8px;
+    background: rgba(255,255,255,.015);
+    overflow: hidden;
+  }
+  .settings-section > summary {
+    padding: 12px 16px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    user-select: none;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .settings-section > summary::before {
+    content: "▸";
+    color: var(--accent2);
+    transition: transform .15s;
+    font-size: 12px;
+  }
+  .settings-section[open] > summary::before { transform: rotate(90deg); }
+  .settings-section > summary:hover { background: rgba(124,108,255,.06); }
+  .settings-section > *:not(summary) { padding: 0 16px; margin-top: 12px; }
+  .settings-section > *:not(summary):first-of-type { margin-top: 0; }
+  .settings-section .field:last-child { padding-bottom: 14px; }
+  .settings-section h4 {
+    font-size: 12.5px;
+    color: var(--accent2);
+    margin: 12px 16px 6px;
+    padding: 0 !important;
+  }
+
+  /* Статистика под ответом */
+  .stats {
+    margin-top: 6px;
+    font-size: 11.5px;
+    color: var(--muted);
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .stats b { color: #9a8fe0; font-weight: 600; }
+
+  /* Перетаскивание сэмплеров */
+  .sampler-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--panel2);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    padding: 6px 10px;
+    cursor: grab;
+    font-size: 13px;
+  }
+  .sampler-row.off { opacity: .45; }
+  .sampler-row .s-name { flex: 1; }
+  .sampler-row .s-hint { font-size: 11px; color: var(--muted); }
+  .sampler-row .s-up, .sampler-row .s-down {
+    cursor: pointer;
+    color: var(--muted);
+    padding: 0 4px;
+    user-select: none;
+  }
+  .sampler-row .s-up:hover, .sampler-row .s-down:hover { color: var(--accent2); }
+
+  /* Скроллбар */
+  ::-webkit-scrollbar { width: 10px; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 5px; }
+  ::-webkit-scrollbar-thumb:hover { background: #3a4258; }
+</style>
+</head>
+<body>
+  <header>
+    <div class="logo">Л</div>
+    <div class="title">Лама Чат</div>
+    <div class="status">
+      <div class="dot wait" id="dot"></div>
+      <span id="status-text">Запуск сервера…</span>
+    </div>
+    <div class="spacer"></div>
+    <button class="btn" id="btn-restart">Перезапустить сервер</button>
+    <button class="btn" id="btn-settings">⚙ Настройки</button>
+  </header>
+
+  <div class="layout">
+    <aside>
+      <div class="side-head">
+        <div class="side-title">Чаты</div>
+        <button class="btn-new" id="btn-new-chat" title="Создать новый чат">+</button>
+      </div>
+      <div class="chat-list" id="chat-list"></div>
+      <div class="side-model">
+        <select id="model-picker" title="Модель этого чата">
+          <option value="">Модель загружается…</option>
+        </select>
+      </div>
+    </aside>
+
+    <div style="display:flex;flex-direction:column;flex:1;min-width:0">
+      <main id="chat">
+        <div class="welcome" id="welcome">
+          <div class="big-logo">Л</div>
+          <h1>Спрашивайте о чём угодно</h1>
+          <p>Лама работает на вашем Mac — без интернета, подписок и слежки. Включите поиск в интернете, если нужен свежий контекст.</p>
+          <div class="examples">
+            <div class="example">Объясни квантовую запутанность простыми словами</div>
+            <div class="example">Напиши письмо-отказ на коммерческое предложение</div>
+            <div class="example">Идеи ужина из того, что есть в холодильнике</div>
+            <div class="example">Помоги придумать план тренировок на неделю</div>
+          </div>
+        </div>
+      </main>
+
+      <div class="composer-wrap">
+        <div class="composer">
+          <textarea id="input" rows="1" placeholder="Напишите сообщение…"></textarea>
+          <div class="composer-bottom">
+            <button class="btn" id="btn-web" title="Искать в интернете перед ответом">🌐 Поиск в интернете</button>
+            <button class="btn" id="btn-file" title="Прикрепить текстовый файл">📎 Загрузить файл</button>
+            <button class="btn" id="btn-stop" style="display:none">Остановить</button>
+            <button class="btn" id="btn-continue" style="display:none" title="Модель продолжит последний ответ">Продолжить</button>
+            <button class="btn primary" id="btn-send">Отправить</button>
+            <div class="hint">Enter — отправить · Shift+Enter — новая строка</div>
+          </div>
+          <div id="attach-bar" style="display:none;gap:6px;flex-wrap:wrap;margin-top:6px"></div>
+        </div>
+        <input type="file" id="file-input" multiple style="display:none"
+               accept=".txt,.md,.markdown,.json,.csv,.tsv,.xml,.html,.htm,.yml,.yaml,.log,.py,.js,.ts,.rs,.c,.h,.cpp,.hpp,.java,.kt,.swift,.go,.rb,.php,.sh,.css,.sql,.toml,.ini,.cfg,.conf,.tex,.srt,.vtt,.env,.gitignore,.pdf" />
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-bg" id="modal-settings">
+    <div class="modal modal-wide">
+      <h2>Настройки</h2>
+
+      <div class="note" style="margin-bottom:12px">Модель чата выбирается списком внизу слева. Все блоки ниже — сворачивающиеся (по умолчанию свёрнуты).</div>
+
+      <details class="settings-section">
+        <summary>Общие (General)</summary>
+        <div class="field">
+          <label style="display:flex;align-items:center;gap:8px;color:var(--text);font-size:13.5px;cursor:pointer">
+            <input type="checkbox" id="ui-send_on_enter" checked /> Отправлять по Enter (Shift+Enter — новая строка)
+          </label>
+        </div>
+        <div class="field">
+          <label style="display:flex;align-items:center;gap:8px;color:var(--text);font-size:13.5px;cursor:pointer">
+            <input type="checkbox" id="ui-show_system_message" /> Показывать системное сообщение сверху чата
+          </label>
+        </div>
+        <div class="field">
+          <label>Заголовок чата</label>
+          <label style="display:flex;align-items:center;gap:8px;color:var(--text);font-size:13.5px;cursor:pointer">
+            <input type="radio" name="title-mode" id="ui-title_use_first_line" checked /> Первая строка сообщения
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;color:var(--text);font-size:13.5px;cursor:pointer;margin-top:4px">
+            <input type="radio" name="title-mode" id="ui-title_use_llm" /> Генерировать нейросетью
+          </label>
+          <div class="note">Как в оригинале: либо первая непустая строка, либо модель сама придумывает название.</div>
+        </div>
+        <div class="field">
+          <label>Длина вставки текста в файл: <b id="lbl-paste_len"></b> символов</label>
+          <input type="range" id="ui-paste_long_text_to_file_len" min="500" max="10000" step="500" />
+          <div class="note">Текст длиннее этого значения при вставке превращается в прикреплённый файл.</div>
+        </div>
+        <div class="field">
+          <label>Шаблон генерации заголовка (для режима «нейросетью»)</label>
+          <textarea id="ui-title_generation_prompt" rows="2" style="width:100%;background:var(--panel2);border:1px solid var(--border2);border-radius:9px;color:var(--text);padding:9px 12px;font-family:inherit;font-size:13px;resize:vertical;outline:none" placeholder="Пусто — стандартный шаблон. {{USER}} и {{ASSISTANT}} подставляются автоматически."></textarea>
+        </div>
+        <div class="field">
+          <label style="display:flex;align-items:center;gap:8px;color:var(--text);font-size:13.5px;cursor:pointer">
+            <input type="checkbox" id="set-web-default" /> Включать поиск в интернете по умолчанию
+          </label>
+        </div>
+      </details>
+
+      <details class="settings-section">
+        <summary>Сэмплирование (Sampling &amp; Penalties)</summary>
+        <div class="grid2">
+          <div class="field">
+            <label>Температура: <b id="lbl-temperature"></b></label>
+            <input type="range" id="gen-temperature" min="0" max="2" step="0.05" />
+            <div class="note">Случайность текста: выше — креативнее, ниже — точнее.</div>
+          </div>
+          <div class="field">
+            <label>Макс. длина ответа (токены): <b id="lbl-n_predict"></b></label>
+            <input type="range" id="gen-n_predict" min="-1" max="4096" step="64" />
+            <div class="note">-1 — без ограничения.</div>
+          </div>
+          <div class="field">
+            <label>Top K: <b id="lbl-top_k"></b></label>
+            <input type="range" id="gen-top_k" min="-1" max="200" step="1" />
+            <div class="note">-1 — выключено. Берёт K самых вероятных токенов.</div>
+          </div>
+          <div class="field">
+            <label>Top P: <b id="lbl-top_p"></b></label>
+            <input type="range" id="gen-top_p" min="0" max="1" step="0.01" />
+          </div>
+          <div class="field">
+            <label>Min P: <b id="lbl-min_p"></b></label>
+            <input type="range" id="gen-min_p" min="0" max="0.5" step="0.01" />
+          </div>
+          <div class="field">
+            <label>Typical P: <b id="lbl-typical_p"></b></label>
+            <input type="range" id="gen-typical_p" min="0" max="1" step="0.01" />
+          </div>
+          <div class="field">
+            <label>Top N Sigma: <b id="lbl-top_n_sigma"></b></label>
+            <input type="range" id="gen-top_n_sigma" min="-1" max="5" step="0.1" />
+          </div>
+          <div class="field">
+            <label>Seed: <b id="lbl-seed"></b></label>
+            <input type="range" id="gen-seed" min="-1" max="100" step="1" />
+            <div class="note">-1 — случайно. Фиксированный = воспроизводимость.</div>
+          </div>
+        </div>
+      </details>
+
+      <details class="settings-section">
+        <summary>Штрафы и анти-повторы (Penalties)</summary>
+        <div class="grid2">
+          <div class="field">
+            <label>Repeat penalty: <b id="lbl-repeat_penalty"></b></label>
+            <input type="range" id="gen-repeat_penalty" min="0.8" max="2" step="0.01" />
+            <div class="note">1 — выключено. Штраф за повтор токенов.</div>
+          </div>
+          <div class="field">
+            <label>Repeat last N: <b id="lbl-repeat_last_n"></b></label>
+            <input type="range" id="gen-repeat_last_n" min="-1" max="512" step="8" />
+            <div class="note">Сколько последних токенов штрафуется. -1 — весь контекст.</div>
+          </div>
+          <div class="field">
+            <label>Presence penalty: <b id="lbl-presence_penalty"></b></label>
+            <input type="range" id="gen-presence_penalty" min="-2" max="2" step="0.05" />
+            <div class="note">0 — выключено. Штраф за само присутствие токена.</div>
+          </div>
+          <div class="field">
+            <label>Frequency penalty: <b id="lbl-frequency_penalty"></b></label>
+            <input type="range" id="gen-frequency_penalty" min="-2" max="2" step="0.05" />
+            <div class="note">0 — выключено. Штраф растёт с частотой повтора.</div>
+          </div>
+        </div>
+        <h4>DRY (повторы последовательностей)</h4>
+        <div class="grid2">
+          <div class="field">
+            <label>Multiplier: <b id="lbl-dry_multiplier"></b></label>
+            <input type="range" id="gen-dry_multiplier" min="0" max="5" step="0.05" />
+            <div class="note">0 — выключено.</div>
+          </div>
+          <div class="field">
+            <label>Base: <b id="lbl-dry_base"></b></label>
+            <input type="range" id="gen-dry_base" min="1" max="4" step="0.05" />
+          </div>
+          <div class="field">
+            <label>Allowed length: <b id="lbl-dry_allowed_length"></b></label>
+            <input type="range" id="gen-dry_allowed_length" min="1" max="20" step="1" />
+          </div>
+          <div class="field">
+            <label>Penalty last N: <b id="lbl-dry_penalty_last_n"></b></label>
+            <input type="range" id="gen-dry_penalty_last_n" min="-1" max="512" step="8" />
+          </div>
+        </div>
+      </details>
+
+      <details class="settings-section">
+        <summary>Особые режимы сэмплинга</summary>
+        <div class="grid2">
+          <div class="field">
+            <label>Динамическая температура — диапазон: <b id="lbl-dynatemp_range"></b></label>
+            <input type="range" id="gen-dynatemp_range" min="0" max="5" step="0.1" />
+            <div class="note">0 — выключено. Температура адаптируется под уверенность модели.</div>
+          </div>
+          <div class="field">
+            <label>Динамическая температура — экспонента: <b id="lbl-dynatemp_exponent"></b></label>
+            <input type="range" id="gen-dynatemp_exponent" min="0" max="5" step="0.1" />
+          </div>
+          <div class="field">
+            <label>XTC — вероятность: <b id="lbl-xtc_probability"></b></label>
+            <input type="range" id="gen-xtc_probability" min="0" max="1" step="0.05" />
+            <div class="note">0 — выключено. Вырезает очевидные токены (творческий режим).</div>
+          </div>
+          <div class="field">
+            <label>XTC — порог: <b id="lbl-xtc_threshold"></b></label>
+            <input type="range" id="gen-xtc_threshold" min="0" max="0.5" step="0.01" />
+          </div>
+          <div class="field">
+            <label>Mirostat: <b id="lbl-mirostat"></b></label>
+            <input type="range" id="gen-mirostat" min="0" max="2" step="1" />
+            <div class="note">0 — выключено, 1/2 — адаптивная перплексия.</div>
+          </div>
+          <div class="field">
+            <label>Mirostat tau: <b id="lbl-mirostat_tau"></b> · eta: <b id="lbl-mirostat_eta"></b></label>
+            <div style="display:flex;gap:8px">
+              <input type="range" id="gen-mirostat_tau" min="0" max="10" step="0.5" style="flex:1" />
+              <input type="range" id="gen-mirostat_eta" min="0" max="1" step="0.05" style="flex:1" />
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <details class="settings-section">
+        <summary>Порядок сэмплеров (Samplers)</summary>
+        <div class="field">
+          <div class="note" style="margin-bottom:8px">Сэмплеры применяются по порядку сверху вниз (как в оригинальном интерфейсе). Снимите галочку, чтобы выключить сэмплер, стрелками меняйте порядок.</div>
+          <div id="samplers-list" style="display:flex;flex-direction:column;gap:4px"></div>
+        </div>
+        <div class="field">
+          <label style="display:flex;align-items:center;gap:8px;color:var(--text);font-size:13.5px;cursor:pointer">
+            <input type="checkbox" id="gen-backend_sampling" /> Сэмплирование на ускорителе (Metal)
+          </label>
+          <div class="note">Сэмплеры считаются на GPU — быстрее на длинных генерациях.</div>
+        </div>
+        <div class="field">
+          <label style="display:flex;align-items:center;gap:8px;color:var(--text);font-size:13.5px;cursor:pointer">
+            <input type="checkbox" id="gen-timings_per_token" /> Тайминги каждого токена
+          </label>
+        </div>
+      </details>
+
+      <details class="settings-section">
+        <summary>Размышления (Reasoning)</summary>
+        <div class="field">
+          <label style="display:flex;align-items:center;gap:8px;color:var(--text);font-size:13.5px;cursor:pointer">
+            <input type="checkbox" id="gen-enable_thinking" checked /> Разрешить модели размышлять (thinking)
+          </label>
+          <div class="note">Выключено — reasoning-модель отвечает сразу, без блока размышлений.</div>
+        </div>
+        <div class="field">
+          <label style="display:flex;align-items:center;gap:8px;color:var(--text);font-size:13.5px;cursor:pointer">
+            <input type="checkbox" id="gen-disable_reasoning_parsing" /> Отключить парсинг размышлений
+          </label>
+          <div class="note">reasoning_format=none — размышления придут внутри текста ответа.</div>
+        </div>
+        <div class="field">
+          <label style="display:flex;align-items:center;gap:8px;color:var(--text);font-size:13.5px;cursor:pointer">
+            <input type="checkbox" id="gen-exclude_reasoning_from_context" /> Исключать размышления из контекста
+          </label>
+          <div class="note">Не отправлять блоки размышлений предыдущих ответов обратно модели.</div>
+        </div>
+        <div class="field">
+          <label style="display:flex;align-items:center;gap:8px;color:var(--text);font-size:13.5px;cursor:pointer">
+            <input type="checkbox" id="ui-show_thought_in_progress" /> Раскрывать размышления во время генерации
+          </label>
+        </div>
+      </details>
+
+      <details class="settings-section">
+        <summary>Вид (Display)</summary>
+        <div class="field">
+          <label>Тема интерфейса</label>
+          <select id="set-theme" style="width:auto">
+            <option value="dark">Тёмная</option>
+            <option value="light">Светлая</option>
+          </select>
+        </div>
+        <div class="field">
+          <label style="display:flex;align-items:center;gap:8px;color:var(--text);font-size:13.5px;cursor:pointer">
+            <input type="checkbox" id="ui-show_message_stats" checked /> Показывать статистику под ответами
+          </label>
+          <div class="note">Токены в промпте/ответе и скорость генерации.</div>
+        </div>
+        <div class="field">
+          <label style="display:flex;align-items:center;gap:8px;color:var(--text);font-size:13.5px;cursor:pointer">
+            <input type="checkbox" id="ui-render_user_markdown" checked /> Рендерить сообщения пользователя как Markdown
+          </label>
+        </div>
+        <div class="field">
+          <label style="display:flex;align-items:center;gap:8px;color:var(--text);font-size:13.5px;cursor:pointer">
+            <input type="checkbox" id="ui-render_thinking_markdown" checked /> Рендерить размышления как Markdown
+          </label>
+        </div>
+        <div class="field">
+          <label style="display:flex;align-items:center;gap:8px;color:var(--text);font-size:13.5px;cursor:pointer">
+            <input type="checkbox" id="ui-full_height_code_blocks" /> Код-блоки во всю высоту
+          </label>
+          <div class="note">Без ограничений высоты и прокрутки внутри блока.</div>
+        </div>
+        <div class="field">
+          <label style="display:flex;align-items:center;gap:8px;color:var(--text);font-size:13.5px;cursor:pointer">
+            <input type="checkbox" id="ui-disable_auto_scroll" /> Отключить автопрокрутку при генерации
+          </label>
+        </div>
+        <div class="field">
+          <label style="display:flex;align-items:center;gap:8px;color:var(--text);font-size:13.5px;cursor:pointer">
+            <input type="checkbox" id="ui-show_model_quantization" checked /> Показывать квант модели (Q4_K_M и т.п.)
+          </label>
+        </div>
+        <div class="field">
+          <label style="display:flex;align-items:center;gap:8px;color:var(--text);font-size:13.5px;cursor:pointer">
+            <input type="checkbox" id="ui-show_model_org_name" /> Показывать автора модели в списке
+          </label>
+        </div>
+        <div class="field">
+          <label style="display:flex;align-items:center;gap:8px;color:var(--text);font-size:13.5px;cursor:pointer">
+            <input type="checkbox" id="ui-show_build_version" /> Показывать версию сборки
+          </label>
+        </div>
+      </details>
+
+      <details class="settings-section">
+        <summary>Вложения (Attachments)</summary>
+        <div class="field">
+          <label style="display:flex;align-items:center;gap:8px;color:var(--text);font-size:13.5px;cursor:pointer">
+            <input type="checkbox" id="ui-pdf_as_image" /> PDF как изображения
+          </label>
+          <div class="note">Сканировать PDF картинками, а не текстом (для vision-моделей).</div>
+        </div>
+        <div class="field">
+          <label>Макс. разрешение картинок: <b id="lbl-max_mpx"></b> Мп</label>
+          <input type="range" id="ui-max_image_mpixels" min="0" max="20" step="0.5" />
+          <div class="note">0 — без ограничения. Большие картинки уменьшаются перед отправкой.</div>
+        </div>
+      </details>
+
+      <details class="settings-section">
+        <summary>Производительность (Performance)</summary>
+        <div class="field">
+          <label style="display:flex;align-items:center;gap:8px;color:var(--text);font-size:13.5px;cursor:pointer">
+            <input type="checkbox" id="gen-pre_fill_kv_cache" /> Предзаполнять KV-кэш после ответа
+          </label>
+          <div class="note">После каждого ответа диалог заранее кодируется на сервере — следующий вопрос обрабатывается быстрее.</div>
+        </div>
+      </details>
+
+      <details class="settings-section">
+        <summary>Для разработчика (Developer)</summary>
+        <div class="field">
+          <label>Произвольные параметры (Custom JSON)</label>
+          <textarea id="gen-custom_json" rows="3" style="width:100%;background:var(--panel2);border:1px solid var(--border2);border-radius:9px;color:var(--text);padding:9px 12px;font-family:ui-monospace,Menlo,monospace;font-size:12.5px;resize:vertical;outline:none" placeholder='{"n_probs": 5, "ignore_eos": false}'></textarea>
+          <div class="note">JSON мерджится в запрос к серверу — для параметров, которых нет в интерфейсе.</div>
+        </div>
+        <div class="field">
+          <label>Свой CSS</label>
+          <textarea id="ui-custom_css" rows="3" style="width:100%;background:var(--panel2);border:1px solid var(--border2);border-radius:9px;color:var(--text);padding:9px 12px;font-family:ui-monospace,Menlo,monospace;font-size:12px;resize:vertical;outline:none" placeholder=".bubble { font-size: 16px; }"></textarea>
+          <div class="note">CSS внедряется в страницу при запуске (Custom CSS из оригинала).</div>
+        </div>
+        <div class="field">
+          <label style="display:flex;align-items:center;gap:8px;color:var(--text);font-size:13.5px;cursor:pointer">
+            <input type="checkbox" id="ui-show_raw_output_switch" /> Кнопка «сырого текста» у сообщений
+          </label>
+          <div class="note">Переключатель Markdown/чистый текст на каждом ответе.</div>
+        </div>
+      </details>
+
+      <details class="settings-section">
+        <summary>Системная подсказка и память</summary>
+        <div class="field">
+          <label>Системная подсказка (характер модели)</label>
+          <textarea id="gen-system_prompt" rows="3" style="width:100%;background:var(--panel2);border:1px solid var(--border2);border-radius:9px;color:var(--text);padding:9px 12px;font-family:inherit;font-size:13.5px;resize:vertical;outline:none" placeholder="Например: Ты — дружелюбный ассистент. Отвечай кратко и по-русски."></textarea>
+          <div class="note">Пусто — шаблон модели по умолчанию.</div>
+        </div>
+        <div class="field">
+          <label>Память диалога: <b id="lbl-n_keep_messages"></b> последних сообщений</label>
+          <input type="range" id="gen-n_keep_messages" min="0" max="50" step="1" />
+          <div class="note">0 — помнить весь диалог.</div>
+        </div>
+      </details>
+
+      <div class="modal-actions">
+        <button class="btn" id="set-reset">Сбросить</button>
+        <button class="btn" id="set-cancel">Отмена</button>
+        <button class="btn primary" id="set-save">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>
